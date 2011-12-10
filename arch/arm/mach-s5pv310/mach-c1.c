@@ -48,6 +48,8 @@
 #include <linux/android_pmem.h>
 #endif
 #include <linux/bootmem.h>
+#include <linux/reboot.h>
+#include <linux/host_notify.h>
 
 #include <asm/pmu.h>
 #include <asm/mach/arch.h>
@@ -3009,12 +3011,12 @@ static int max8997_muic_charger_cb(cable_type_t cable_type)
 	struct power_supply *psy = power_supply_get_by_name("battery");
 	union power_supply_propval value;
 
-	if (!psy) {
+	if(!psy) {
 		pr_err("%s: fail to get battery ps\n", __func__);
 		return -ENODEV;
 	}
 
-	switch (cable_type) {
+	switch(cable_type) {
 	case CABLE_TYPE_NONE:
 	case CABLE_TYPE_OTG:
 	case CABLE_TYPE_JIG_UART_OFF:
@@ -3067,7 +3069,6 @@ static void max8997_muic_usb_cb(u8 usb_mode)
 		ret = udc->change_usb_mode(USB_CABLE_DETACHED);
 		if (ret < 0)
 			pr_warn("%s: fail to change mode!!!\n", __func__);
-
 		regulator = regulator_get(NULL, "safeout1");
 		if (IS_ERR(regulator)) {
 			pr_err("%s: fail to get regulator\n", __func__);
@@ -3098,7 +3099,6 @@ static void max8997_muic_usb_cb(u8 usb_mode)
 		ret = udc->change_usb_mode(usb_mode);
 		if (ret < 0)
 			pr_err("%s: fail to change mode!!!\n", __func__);
-
 		if (usb_mode == USB_OTGHOST_DETACHED)
 			otg_data->set_pwr_cb(0);
 	}
@@ -3533,7 +3533,7 @@ static u8 t8_config[] = {GEN_ACQUISITIONCONFIG_T8,
 static u8 t9_config[] = {TOUCH_MULTITOUCHSCREEN_T9,
 				131, 0, 0, 19, 11, 0, 32, MXT224_THRESHOLD, 2, 1,
 				0,
-				15,		/* MOVHYSTI */
+				0,		/* MOVHYSTI */
 				1, 11, MXT224_MAX_MT_FINGERS, 5, 40, 10, 31, 3,
 				223, 1, 0, 0, 0, 0, 143, 55, 143, 90, 18};
 
@@ -7194,12 +7194,15 @@ static struct platform_device *smdkc210_devices[] __initdata = {
 #ifdef CONFIG_USB_GADGET
 	&s3c_device_usbgadget,
 #endif
+#ifdef CONFIG_USB_ANDROID
+	&s3c_device_android_usb,
+#ifdef CONFIG_USB_ANDROID_MASS_STORAGE
+	&s3c_device_usb_mass_storage,
+#endif
 #ifdef CONFIG_USB_ANDROID_RNDIS
 	&s3c_device_rndis,
 #endif
-#ifdef CONFIG_USB_ANDROID
-	&s3c_device_android_usb,
-	&s3c_device_usb_mass_storage,
+
 #endif
 #ifdef CONFIG_USB_S3C_OTG_HOST
 	&s3c_device_usb_otghcd,
@@ -7954,6 +7957,8 @@ static void __init smdkc210_machine_init(void)
 	s3c_usb_set_serial();
 /* Changes value of nluns in order to use external storage */
 	usb_device_init();
+#else
+    s3c_usb_otg_composite_pdata(&fb_platform_data);
 #endif
 
 /* klaatu: semaphore logging code - for debug  */
